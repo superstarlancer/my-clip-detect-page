@@ -205,6 +205,7 @@
   <div id="explorerContextMenu"
     class="hidden fixed z-50 bg-slate-900 text-slate-100 text-xs rounded shadow-lg border border-slate-700 explorer-menu">
     <div class="explorer-menu-item" onclick="copyFromContext()">Copy to Local...</div>
+    <div class="explorer-menu-item" onclick="saveToMegaFromContext()">Save into Mega...</div>
     <div class="explorer-menu-item text-rose-300" onclick="deleteFromContext()">Delete</div>
   </div>
 
@@ -856,6 +857,20 @@
       closeExplorerMenu();
     }
 
+    window.saveToMegaFromContext = function () {
+      if (!explorerContext) return;
+      if (explorerContext.isDir) {
+        alert("Save into Mega is only supported for files at the moment.");
+        closeExplorerMenu();
+        return;
+      }
+      socket.emit("save_to_mega", {
+        nodeId: explorerContext.nodeId,
+        path: explorerContext.path
+      });
+      closeExplorerMenu();
+    }
+
     window.deleteFromContext = function () {
       if (!explorerContext) return;
       const kind = explorerContext.isDir ? "folder and all its contents" : "file";
@@ -907,6 +922,16 @@
       } catch (e) {
         alert("Error creating download: " + e);
       }
+    });
+
+    socket.on("mega_save_result", ({ client, path, success, url, error }) => {
+      if (!success) {
+        if (error) alert("Save into Mega failed: " + error);
+        return;
+      }
+      let msg = "Saved into Mega:\n" + (path || "");
+      if (url) msg += "\nLink: " + url;
+      alert(msg);
     });
 
     socket.on("upload_result", ({ client, path, name, success, error }) => {
